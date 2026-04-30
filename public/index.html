@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Record Management</title>
+</head>
+<body>
+<h1>Student Record Management</h1>
+
+<h2>Add Student</h2>
+<p id="msg"></p>
+<form id="add-form">
+  <input name="name" placeholder="Name" required>
+  <input name="rollNumber" placeholder="Roll Number" required>
+  <input name="branch" placeholder="Branch">
+  <input name="marks" type="number" min="0" max="100" placeholder="Marks">
+  <button type="submit">Add</button>
+</form>
+
+<h2>All Students</h2>
+
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Roll No</th>
+      <th>Branch</th>
+      <th>Marks</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody id="student-rows"></tbody>
+
+
+<script>
+const API = '/api/students';
+const rowsEl = document.getElementById('student-rows');
+const form = document.getElementById('add-form');
+const msg = document.getElementById('msg');
+
+function showMsg(text) {
+  msg.textContent = text;
+  setTimeout(() => { msg.textContent = ''; }, 2000);
+}
+
+async function loadStudents() {
+  const res = await fetch(API);
+  const data = await res.json();
+  if (data.length === 0) {
+    rowsEl.innerHTML = '<tr><td colspan="5">No students yet.</td></tr>';
+    return;
+  }
+  rowsEl.innerHTML = data.map(s => `
+    <tr>
+      <td>${s.name}</td>
+      <td>${s.rollNumber}</td>
+      <td>${s.branch || '-'}</td>
+      <td><input type="number" min="0" max="100" value="${s.marks ?? ''}" data-id="${s._id}" class="marks-input"></td>
+      <td><button data-id="${s._id}" class="del-btn">Delete</button></td>
+    </tr>
+  `).join('');
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(form);
+  const body = Object.fromEntries(fd.entries());
+  if (body.marks === '') delete body.marks;
+  const res = await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    showMsg(data.error);
+    return;
+  }
+  form.reset();
+  showMsg('Student added');
+  loadStudents();
+});
+
+rowsEl.addEventListener('click', async (e) => {
+  if (!e.target.classList.contains('del-btn')) return;
+  if (!confirm('Delete this student?')) return;
+  const id = e.target.dataset.id;
+  await fetch(`${API}/${id}`, { method: 'DELETE' });
+  showMsg('Student deleted');
+  loadStudents();
+});
+
+rowsEl.addEventListener('change', async (e) => {
+  if (!e.target.classList.contains('marks-input')) return;
+  const id = e.target.dataset.id;
+  const marks = Number(e.target.value);
+  await fetch(`${API}/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ marks })
+  });
+  showMsg('Marks updated');
+});
+
+loadStudents();
+</script>
+</body>
+</html>
